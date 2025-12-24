@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Google SecOps Mock Exam</title>
+
+<style>
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+}
+.container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 25px;
+  background:#020617;
+  border-radius:12px;
+}
+h1 { text-align:center; }
+button {
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
+.next { background:#2563eb; color:#fff; }
+.prev { background:#475569; color:#fff; }
+.show { background:#64748b; color:#fff; }
+.answer {
+  display:none;
+  background:#052e16;
+  padding:10px;
+  margin-top:10px;
+  border-radius:8px;
+}
+.hidden { display:none; }
+.topbar {
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:15px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>Google SecOps – Mock Exam</h1>
+
+<div class="topbar">
+  <div id="progress"></div>
+  <div id="timer"></div>
+</div>
+
+<div id="examBox">
+  <p id="question" style="font-size:1.1rem;"></p>
+  <div id="options"></div>
+  <br>
+  <button class="show" onclick="showAnswer()">Show Answer</button>
+  <button class="prev" onclick="prevQuestion()">Previous</button>
+  <button class="next" onclick="nextQuestion()">Next</button>
+  <div class="answer" id="answer"></div>
+</div>
+
+<div id="result" class="hidden"></div>
+
+</div>
+
+<script>
+// ==================================================
+// NORMALIZE ANSWERS (FIX CLAVE)
+// ==================================================
+function normalizeAnswer(ans) {
+  return ans
+    .toUpperCase()
+    .replace(/[^A-D]/g, '')
+    .split('');
+}
+
+// ==================================================
+// QUESTIONS (TU CSV, SIN CAMBIOS)
+// ==================================================
+const csvData = `
+"You need to augment your organization's existing SCC implementation with additional detectors using known IoCs. What should you do?"|"Create a custom posture combining ETD and SHA"|"Create a SHA custom module using compute address"|"Create an Event Threat Detection custom module using the Configurable Bad IP template"|"Create a custom log sink and generate findings via API"|"C"
+"Your SecOps tenant ingests firewall logs with a Google-managed parser. New fields are unparsed after a vendor update. What should you do?"|"Copy and modify the default parser"|"Use Extract Additional Fields only"|"Deploy a third-party pipeline"|"Deploy a parser extension with custom mapping"|"D"
+"You need to evaluate fast integration of a third-party EDR tool into SecOps with minimal customization. What should you do?"|"Review vendor hosting architecture"|"Verify default parsers exist"|"Check SecOps Marketplace for supported actions"|"Build a custom Python integration"|"B y C"
+"You need to extract users from a UDM query and add them automatically as entities in a SOAR playbook. What should you do?"|"Manually instruct analysts to add entities"|"Use Create Entity with Expression Builder"|"Use manual Create Entity input"|"Create a separate case per user"|"B"
+"You need to detect internal hosts communicating with APT41 IPs using Fusion Feed. How should you configure the YARA-L rule?"|"Use a static data table of IPs"|"Join network events with Fusion Feed and filter for APT41"|"Match high confidence IPs from any feed"|"Query Fusion Feed in SOAR after detection"|"B"
+"You need to improve detection coverage and reduce false positives as quickly as possible. What should you do?"|"Ingest more threat intel"|"Develop custom YARA-L rules"|"Use Marketplace use cases"|"Enable curated detections"|"D"
+"A YARA-L rule produces too many false positives from MISP threat intel. How do you reduce them?"|"Increase match window"|"Trigger only on high risk_score"|"Filter indicators to HIGH or CRITICAL severity"|"Convert rule to dashboard"|"C"
+"You need ETD detections for data exfiltration while minimizing logging costs. What should you do?"|"Enable Data Read logs only on sensitive resources"|"Enable Data Read logs everywhere"|"Enable Data Read and Write logs org-wide"|"Enable VPC Flow Logs"|"A"
+"You want to ingest SCC findings into SOAR actions. What should you do?"|"Use Pub/Sub feeds"|"Install SCC integration from Marketplace"|"Export to Cloud Storage"|"Use Rapid Response integration"|"B"
+"You want to capture time duration per case stage with minimal maintenance. What should you do?"|"Build dashboards calculating time manually"|"Use Case Stages and Change Case Stage actions"|"Add timestamps via detection rules"|"Write a scheduled job"|"B"
+"You want to detect silent ingestion sources within five minutes. What should you do?"|"Monitor ingestion dashboards"|"Use metric-absence alert in Cloud Monitoring grouped by collector_id"|"Create BigQuery queries"|"Use SOAR polling"|"B"
+"Before a CVE is released| you want to hunt for exploitation of a zero-day XSS vulnerability. What should you do?"|"Create YARA-L rule correlating inbound traffic and anomalous process execution"|"Run Web Security Scanner"|"Ask Gemini for vulnerabilities"|"Detect known C2 traffic"|"A"
+"All DLP cases must be categorized with a root cause before closure. How do you enforce this?"|"Use tags"|"Modify case name"|"Customize Close Case dialog with mandatory root cause"|"Auto-tag with playbooks"|"C"
+"You need to mark IP entities as internal automatically in SOAR. What should you do?"|"Use enrichment playbooks"|"Query CMDB"|"Define internal CIDR ranges in Environment Networks"|"Ping IPs"|"C"
+"You need to identify unknown C2 servers within 24 hours. What should you do?"|"Review SHA findings"|"Analyze BigQuery anomalies"|"Scan known threat intel"|"Compare outbound traffic to newly registered domains via YARA-L retrohunt"|"D"
+"You need to label internal IP entities with network names for playbook triggers. What should you do?"|"Configure networks in SOAR settings"|"Modify entity attributes manually"|"Assign network name in detection rule"|"Enrich entities in playbooks"|"A"
+"You need to calculate MTTR in SecOps. What should you do?"|"Use detection rules"|"Use case stages and dashboards"|"Write custom jobs"|"Build Looker only dashboards"|"B"
+"A threat intel YARA-L rule generates false positives. What is the best tuning approach?"|"Extend match window"|"Filter by HIGH or CRITICAL severity"|"Increase risk score threshold"|"Convert to report"|"B"
+"You want to automate SCC findings into a SOC ticketing system efficiently. What should you do?"|"Use Pub/Sub feeds"|"Manual ticket creation"|"Enable SOAR playbook with ticketing integration"|"Export to Cloud Storage"|"C"
+"Container Threat Detection reports binary execution in a critical workload. What should you do?"|"Delete the pod immediately"|"Ignore and monitor"|"Notify owner and follow IR playbook"|"Investigate pod and related resources"|"C y D"
+"Respuesta multiple,SOC users authenticate via IdP but cannot access SecOps. What should you do?"|"Link Chronicle API"|"Configure Workforce Identity Federation"|"Grant roles/chronicle.viewer"|"Grant SOAR Basic permission"|"C y D"
+"You need to import SCC findings into SOAR actions. How should you configure it?"|"Use Rapid Response"|"Install SCC Marketplace integration"|"Use Pub/Sub"|"Export to Cloud Storage"|"B"
+"You want to reduce false positives while using threat intelligence. What should you do?"|"Increase window"|"Filter to HIGH/CRITICAL severity"|"Disable threat intel"|"Convert to dashboard"|"B"
+"You want to ingest on-prem firewall logs via Syslog. What should you do?"|"Send logs directly to SecOps URL"|"Deploy SecOps forwarder as Syslog destination"|"Use threat intel feed"|"Use Ops Agent"|"B"
+"You want ingestion alerts and dashboards for silent sources. What should you do?"|"Use Risk Analytics"|"Use ingestion reports only"|"Use Bindplane OP"|"Use Cloud Monitoring alerts and dashboards"|"D"
+"You want to detect silent collection agents within five minutes. What should you do?"|"Use dashboards"|"Use Cloud Monitoring metric-absence alert"|"Use BigQuery queries"|"Use SOAR polling"|"B"
+"You are an MSSP and need logical separation of customer cases. What should you do?"|"Create roles"|"Create playbooks"|"Create permission groups"|"Create SOAR environments"|"D"
+"A scheduled SecOps report exports to BigQuery but no data appears. What should you do?"|"Grant user Data Viewer"|"Grant SecOps service account BigQuery Data Editor"|"Enable table expiration"|"Reschedule report"|"B"
+"You want fast reputation context for an external IP seen in logs. What should you do?"|"Search Alerts & IoCs"|"Check asset view"|"Create detection rule"|"Run UDM search"|"A"
+"A YARA-L rule using MISP produces false positives. What should you do?"|"Increase window"|"Use risk_score only"|"Filter HIGH or CRITICAL indicators"|"Convert to dashboard"|"C"
+"SOC team authenticates via IdP but lacks access. What should you do?"|"Link project"|"Configure WIF"|"Grant roles/chronicle.viewer"|"Grant SOAR Basic permission"|"C|D"
+"You want SCC findings available in SOAR playbooks. What should you do?"|"Use Pub/Sub"|"Install SCC Marketplace integration"|"Export to GCS"|"Use Dataflow"|"B"
+"You want internal IPs marked automatically in SOAR. What should you do?"|"Use enrichment"|"Modify rules"|"Configure Environment Networks"|"Query CMDB"|"C"
+"You want to detect unknown C2 infrastructure. What should you do?"|"Use SHA"|"Retrohunt known IoCs"|"Compare traffic to newly registered domains"|"Inspect UEBA only"|"C"
+"Threat intel YARA-L rule is noisy. Best tuning?"|"Increase window"|"Filter by risk score"|"Filter HIGH or CRITICAL severity"|"Convert to report"|"C"
+"You want to add external IoC-based detection to SCC. What should you do?"|"Use SHA custom module"|"Create custom posture"|"Use ETD Configurable Bad IP module"|"Generate findings manually"|"C"
+"Parser misses new vendor fields but base parsing works. Best fix?"|"Copy parser"|"Extract fields only"|"Use third-party pipeline"|"Deploy parser extension"|"D"
+"You want to verify minimal-effort integration of a new tool. What should you do?"|"Review vendor infra"|"Check default parsers"|"Check Marketplace actions"|"Build custom integration"|"B|C"
+"You want to track MTTR with low maintenance. What should you do?"|"Custom dashboards"|"Detection timestamps"|"Case stages with Change Case Stage"|"Scheduled jobs"|"C"
+"You want silent source alerts and ingestion dashboards. What should you do?"|"Risk Analytics"|"Ingestion reports only"|"Bindplane OP"|"Cloud Monitoring alerts and dashboards"|"D"
+"You are ingesting and parsing logs from an SSO provider and an on-premises appliance. Restricted users expire after five days. How do you detect restricted user logins?"|"Use SOAR global context values with TTL"|"Rebuild detection rules daily"|"Store restricted users in a data table with TTL and row-based comparison"|"Store users in a delimited string and parse in YARA-L"|"C"
+"You suspect an APT operated undetected. You have a hash| a C2 domain and PowerShell behavior. Hashes are unreliable. What is the best detection approach?"|"Search for rundll32 activity"|"Create a single-event YARA-L rule"|"Create a multi-event YARA-L rule"|"Create a data table with hash and domain triggering on PROCESS or DNS events"|"D"
+"You want to test a YARA-L rule with minimal production impact before enabling alerts. What should you do?"|"Develop the rule via UDM search"|"Generate the rule with Gemini"|"Use the Rules Editor Test Rule feature"|"Enable the rule without alerting"|"C"
+"You are creating a SOAR playbook that queries VirusTotal for a suspicious URL. Choose 2 answers."|"Use conditional logic to classify the URL"|"Send the response back to the SIEM"|"Manually validate the URL"|"Create a JSON widget"|"Use detection count from the response JSON"|"A|E"
+"Endpoint containment requires user approval by email and must continue automatically after approval. What should you do?"|"Set containment to manual"|"Wait for analyst confirmation"|"Wait for email thread reply"|"Use an approval link with automated handling"|"D"
+"You suspect lateral movement from a GKE cluster and want to prioritize investigation before deep log analysis. What should you do?"|"Review threat intel feeds"|"Investigate VM Threat Detection"|"Auto-isolate the GKE cluster"|"Analyze findings and attack paths in SCC"|"D"
+"A playbook must execute external actions every day at a specific time with minimal maintenance. What should you do?"|"Write a custom SOAR job"|"Use a Cron Scheduled Connector"|"Trigger playbook manually"|"Run playbook from a VM"|"B"
+"You want to use only your custom MISP feed in a YARA-L rule. How do you filter the entity graph?"|"ENTITY_CONTEXT source type"|"GLOBAL_CONTEXT source type"|"DERIVED_CONTEXT source type"|"UNSPECIFIED source type"|"A"
+"You want to automate remediation and ticket creation from SCCE findings. What is the most efficient solution?"|"Send findings via Pub/Sub"|"Manual ticket creation"|"Enable a SOAR playbook with ticketing integration"|"Process findings with Dataflow"|"C"
+"You want to identify unknown C2 servers within 24 hours. What is the most effective approach?"|"Review SHA findings"|"Analyze BigQuery traffic"|"Scan inbound traffic for IoCs"|"Compare outbound traffic to newly registered domains with YARA-L retrohunt"|"D"
+"You identified a common malware variant and need reliable IoCs fast. What should you do?"|"Search the hash in Google Threat Intelligence"|"Google web search"|"Manual malware analysis"|"UDM search only"|"A"
+"You need to capture time spent in each case stage with minimal maintenance. What should you do?"|"Manual dashboards"|"Use Case Stages and Change Case Stage"|"Detection-based timestamps"|"Custom background job"|"B"
+"A production server shows unauthorized activity. You need immediate containment while preserving evidence. What should you do first?"|"Block the IP"|"Patch and reboot"|"Quarantine the asset with EDR"|"Block domains via VirusTotal"|"C"
+"The SOC director must be emailed automatically when an escalated case is closed. What is the best solution?"|"Scheduled job"|"SOAR playbook condition on close"|"Manual email"|"Export case data"|"B"
+"You acquired another company and want analysts separated but playbooks reused. What should you do first?"|"Create a new SOAR environment"|"Create a new role"|"Create a new service account"|"Buy a new tenant"|"A"
+"You need better detection coverage and fewer false positives quickly. What should you do?"|"Ingest more threat intel"|"Write custom YARA-L rules"|"Use Marketplace examples"|"Enable curated detections"|"D"
+"A detection rule flags Cloud Storage enumeration but a backup service causes false positives. How do you tune it?"|"Lower severity"|"Make it multi-event"|"Change api.service_name"|"Exclude the backup service account"|"D"
+"You need ETD detections for data exfiltration with minimal logging cost. What should you do?"|"Enable Data Read logs only on sensitive resources"|"Enable all logs"|"Enable org-wide audit logs"|"Enable VPC Flow Logs"|"A"
+"You want SCC findings available for SOAR actions. What is the correct configuration?"|"Rapid Response integration"|"SCC Marketplace integration"|"Pub/Sub feed"|"Cloud Storage export"|"B"
+"You want to detect anomalous user data downloads with minimal effort. What should you do?"|"Custom YARA-L rule"|"Cloud Monitoring metric"|"Review SHA findings"|"Enable UEBA curated detections"|"D"
+"You need to ingest on-prem firewall logs via Syslog. What is the correct approach?"|"Send logs directly to API"|"Deploy SecOps forwarder as Syslog destination"|"Export to Cloud Storage"|"Poll via SOAR connector"|"B"
+"You want alerts for silent log sources and ingestion dashboards. What should you do?"|"YARA-L rules"|"Cloud Monitoring alerts and dashboards"|"SOAR polling"|"BigQuery queries"|"B"
+"You need to extract users from a UDM query and add them automatically as entities. What should you do?"|"Custom script"|"Manual addition"|"Create Entity with Expression Builder"|"Global variable"|"C"
+"You want to detect internal hosts communicating with APT41 IPs. What should you do?"|"Inbound matching"|"Join network events with Fusion Feed"|"DNS-only detection"|"SOAR enrichment"|"B"
+"You must enforce root cause selection for DLP cases. What should you do?"|"Training"|"Auto-tagging"|"Mandatory Close Case dialog field"|"External validation"|"C"
+"You want to detect silent collection agents within five minutes. What should you do?"|"Dashboards"|"Cloud Monitoring metric-absence alert"|"BigQuery queries"|"SOAR polling"|"B"
+"You are an MSSP and need customer data separation while reusing playbooks. What should you do?"|"Separate roles"|"Separate tenants"|"Separate SOAR environments"|"Separate rules"|"C"
+"A report exports successfully but no data appears in BigQuery. What is the fix?"|"Grant user permissions"|"Grant SecOps service account BigQuery Data Editor"|"Enable expiration"|"Reschedule"|"B"
+"You want fast reputation context for an external IP. What should you do?"|"UDM search"|"Asset view"|"Search Alerts & IoCs"|"Create rule"|"C"
+"A YARA-L rule using MISP is noisy. How do you tune it?"|"Increase window"|"Risk score threshold"|"Filter HIGH or CRITICAL severity"|"Dashboard only"|"C"
+"You need to extend SCC with external IoC-based detection. What should you do?"|"SHA custom module"|"Custom posture"|"ETD Configurable Bad IP module"|"Manual API findings"|"C"
+"A Google-managed parser misses new vendor fields. Best fix?"|"Copy parser"|"UI extraction"|"Third-party pipeline"|"Parser extension"|"D"
+"You want to validate minimal-effort integration of a new tool. Choose 2."|"Review vendor infra"|"Check default parsers"|"Check Marketplace actions"|"Build custom integration"|"B|C"
+"You want to track MTTR with minimal maintenance. What should you do?"|"Manual dashboards"|"Detection timestamps"|"Case stages with Change Case Stage"|"External job"|"C"
+"You want silent source alerts and ingestion metrics visualization. What should you do?"|"Risk Analytics"|"Ingestion reports"|"Bindplane OP"|"Cloud Monitoring alerts and dashboards"|"D"
+`;
+
+// ==================================================
+// PARSER
+// ==================================================
+let questions = csvData.trim().split('\n').map(row => {
+  const parts = row.split('|').map(p => p.replace(/^\"|\"$/g,''));
+  return {
+    q: parts[0],
+    options: { A:parts[1], B:parts[2], C:parts[3], D:parts[4] },
+    answer: parts[5]
+  };
+}).sort(() => Math.random() - 0.5);
+
+// ==================================================
+// STATE
+// ==================================================
+let index = 0;
+let userAnswers = {};
+let failedQuestions = [];
+let correct = 0;
+
+// ==================================================
+// TIMER (120 MIN)
+// ==================================================
+let timeLeft = 120 * 60;
+const timer = setInterval(() => {
+  timeLeft--;
+  document.getElementById("timer").innerText =
+    `Time left: ${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`;
+  if (timeLeft <= 0) finishExam();
+},1000);
+
+// ==================================================
+// RENDER
+// ==================================================
+function loadQuestion() {
+  const q = questions[index];
+  document.getElementById("progress").innerText =
+    `Question ${index+1} / ${questions.length}`;
+  document.getElementById("question").innerText = q.q;
+
+  const opts = document.getElementById("options");
+  opts.innerHTML = "";
+  for (let k in q.options) {
+    const checked = userAnswers[index] === k ? "checked" : "";
+    opts.innerHTML += `
+      <label>
+        <input type="radio" name="opt" value="${k}" ${checked}>
+        ${k}. ${q.options[k]}
+      </label><br>`;
+  }
+
+  document.getElementById("answer").style.display = "none";
+  document.getElementById("answer").innerText =
+    `Correct answer(s): ${normalizeAnswer(q.answer).join(', ')}`;
+}
+
+// ==================================================
+// ACTIONS
+// ==================================================
+function saveAnswer() {
+  const sel = document.querySelector("input[name='opt']:checked");
+  if (sel) userAnswers[index] = sel.value;
+}
+
+function nextQuestion() {
+  saveAnswer();
+  if (index < questions.length - 1) {
+    index++;
+    loadQuestion();
+  } else {
+    finishExam();
+  }
+}
+
+function prevQuestion() {
+  saveAnswer();
+  if (index > 0) {
+    index--;
+    loadQuestion();
+  }
+}
+
+function showAnswer() {
+  document.getElementById("answer").style.display = "block";
+}
+
+// ==================================================
+// FINISH + RETRY FAILED
+// ==================================================
+function finishExam() {
+  clearInterval(timer);
+  failedQuestions = [];
+  correct = 0;
+
+  questions.forEach((q, i) => {
+    const valid = normalizeAnswer(q.answer);
+    if (userAnswers[i] && valid.includes(userAnswers[i])) {
+      correct++;
+    } else {
+      failedQuestions.push(q);
+    }
+  });
+
+  const score = Math.round((correct / questions.length) * 100);
+
+  document.getElementById("examBox").classList.add("hidden");
+  const r = document.getElementById("result");
+  r.classList.remove("hidden");
+  r.innerHTML = `
+    <h2>Exam Finished</h2>
+    <p>Correct answers: ${correct} / ${questions.length}</p>
+    <p>Score: ${score}%</p>
+    <h3 style="color:${score>=70?'#22c55e':'#ef4444'}">
+      ${score>=70?'PASSED ✅':'FAILED ❌'}
+    </h3>
+    ${failedQuestions.length ? `<button class="next" onclick="retryFailed()">Retry Failed Questions</button>` : ""}
+  `;
+}
+
+function retryFailed() {
+  questions = failedQuestions;
+  userAnswers = {};
+  index = 0;
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("examBox").classList.remove("hidden");
+  loadQuestion();
+}
+
+// ==================================================
+loadQuestion();
+</script>
+
+</body>
+</html>
